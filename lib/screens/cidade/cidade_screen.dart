@@ -19,7 +19,9 @@ class CidadeScreen extends StatefulWidget {
 
 class _CidadeScreenState extends State<CidadeScreen> {
   bool isLoading = true;
-  final Debouncer debouncer = Debouncer(milliseconds: 0);
+  String currentSearchText = '';
+  final Debouncer debouncer = Debouncer(milliseconds: 500);
+  // Removido o controller que não estava sendo usado corretamente
 
   @override
   void initState() {
@@ -34,11 +36,41 @@ class _CidadeScreenState extends State<CidadeScreen> {
       }
     });
   }
+  
+  @override
+  void dispose() {
+    // Não precisamos mais fazer dispose do controller
+    super.dispose();
+  }
+
+  void performSearch(String text) {
+    setState(() {
+      currentSearchText = text;
+      isLoading = true;
+    });
+    
+    final cidadeController =
+        Provider.of<CidadeController>(context, listen: false);
+            
+    if (text.isEmpty) {
+      cidadeController.clearSearch();
+      setState(() {
+        isLoading = false;
+      });
+    } else {
+      debouncer.call(() {
+        // Agora usamos o método filterCidadesLocally em vez de searchCidades
+        // já que estamos tendo problemas com a API
+        cidadeController.filterCidadesLocally(text);
+        setState(() {
+          isLoading = false;
+        });
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-/*     final cidadeController = Provider.of<CidadeController>(context);
- */
     return Scaffold(
       backgroundColor: Colors.white,
       body: Column(
@@ -54,15 +86,7 @@ class _CidadeScreenState extends State<CidadeScreen> {
             iconColor: kDetailColor,
             hintText: 'Buscar por cidades',
             padding: const EdgeInsets.all(5),
-            onSearch: (text) {
-              final cidadeController =
-                  Provider.of<CidadeController>(context, listen: false);
-              if (text.isEmpty) {
-                cidadeController.loadCidades();
-              } else {
-                debouncer.call(() => cidadeController.searchCidades(text));
-              }
-            },
+            onSearch: performSearch,
             setLoading: (loading) {
               setState(() {
                 isLoading = loading;
@@ -76,8 +100,19 @@ class _CidadeScreenState extends State<CidadeScreen> {
                 : Consumer<CidadeController>(
                     builder: (context, cidadeController, child) {
                       if (cidadeController.hasError) {
-                        return _buildEmptyListWidget();
+                        return _buildEmptyListWidget(
+                          cidadeController.errorMessage,
+                          currentSearchText
+                        );
                       }
+                      
+                      if (cidadeController.cidades.isEmpty) {
+                        return _buildEmptyListWidget(
+                          'Nenhuma cidade foi encontrada.',
+                          currentSearchText
+                        );
+                      }
+                      
                       return ListView.builder(
                         itemCount: cidadeController.cidades.length,
                         itemBuilder: (context, index) =>
@@ -146,7 +181,7 @@ class _CidadeScreenState extends State<CidadeScreen> {
     );
   }
 
-  Widget _buildEmptyListWidget() {
+  Widget _buildEmptyListWidget(String message, String searchText) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.only(top: 00.0, left: 21, right: 21),
@@ -155,23 +190,50 @@ class _CidadeScreenState extends State<CidadeScreen> {
           children: [
             const Icon(Icons.storefront, color: kDetailColor, size: 80),
             const SizedBox(height: 20),
-            const Text(
-              'Nenhuma cidade foi encontrada.',
-              style: TextStyle(
+            Text(
+              message,
+              style: const TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
                 color: kDetailColor,
               ),
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 10),
             Text(
-              'Não há cidades cadastradas ou elas estão indisponíveis no momento.',
+              searchText.isEmpty
+                  ? 'Não há cidades cadastradas ou elas estão indisponíveis no momento.'
+                  : 'Tente usar outro termo para a busca.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 16,
                 color: Colors.grey[600],
               ),
             ),
+            if (searchText.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  final controller = Provider.of<CidadeController>(context, listen: false);
+                  controller.clearSearch();
+                  // Não precisamos mais limpar o controller
+                  setState(() {
+                    currentSearchText = '';
+                  });
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: kDetailColor,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text(
+                  'Mostrar todas as cidades',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
           ],
         ),
       ),
