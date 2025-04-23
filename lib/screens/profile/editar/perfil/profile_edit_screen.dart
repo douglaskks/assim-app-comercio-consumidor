@@ -84,9 +84,13 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
   }
 
   Future<void> saveUserProfile() async {
+    print('Iniciando saveUserProfile, isEditing: $isEditing');
+    
     if (!isEditing) return;
     
+    print('Validando formulário');
     if (!_formKey.currentState!.validate()) {
+      print('Formulário inválido');
       return;
     }
 
@@ -95,19 +99,27 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
     });
 
     try {
-      // Usar o controller existente, mas modificar a forma como usamos
+      print('Obtendo token e ID do usuário');
       String userToken = await userStorage.getUserToken();
       String userId = await userStorage.getUserId();
+      print('Token obtido: ${userToken.substring(0, 10)}... (parcial)');
+      print('ID obtido: $userId');
       
       // Formatar o telefone
+      print('Telefone original: ${phoneController.text}');
       String cleanPhone = phoneController.text.replaceAll(RegExp(r'[^0-9]'), '');
+      print('Telefone limpo: $cleanPhone');
       String formattedPhone = cleanPhone;
       if (cleanPhone.length >= 11) {
         formattedPhone = "(${cleanPhone.substring(0, 2)}) ${cleanPhone.substring(2, 7)}-${cleanPhone.substring(7)}";
+        print('Telefone formatado: $formattedPhone');
+      } else {
+        print('AVISO: Telefone com menos de 11 dígitos');
       }
       
-      // Construir o payload manual
+      // Construir o payload
       final url = Uri.parse('$kBaseURL/users/$userId');
+      print('URL: $url');
       final payload = {
         'name': nameController.text,
         'telefone': formattedPhone,
@@ -118,6 +130,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
       
       print('Enviando dados para atualização: $payload');
       
+      print('Iniciando requisição PATCH');
       final response = await http.patch(
         url,
         body: json.encode(payload),
@@ -127,8 +140,11 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
         },
       );
       
+      print('Resposta recebida: ${response.statusCode}');
+      print('Corpo da resposta: ${response.body}');
+      
       if (response.statusCode == 200) {
-        // Atualizar dados locais
+        print('Atualizando dados locais');
         await userStorage.saveUserCredentials(id: userId, token: userToken, nome: nameController.text);
         
         setState(() {
@@ -139,6 +155,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
           originalEmail = emailController.text;
         });
         
+        print('Exibindo SnackBar');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Perfil atualizado com sucesso!'),
@@ -146,6 +163,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
           ),
         );
         
+        print('Navegando para tela de perfil');
         Navigator.pushNamed(context, Screens.profile);
       } else {
         setState(() {
@@ -159,7 +177,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen>
         // Reverte as alterações em caso de erro
         revertChanges();
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('Exceção capturada: $e');
+      print('Stack trace: $stackTrace');
       setState(() {
         isSaving = false;
         errorMessage = 'Erro ao atualizar perfil: $e';
