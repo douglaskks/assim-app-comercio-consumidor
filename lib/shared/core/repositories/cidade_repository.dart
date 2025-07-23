@@ -48,4 +48,23 @@ class CidadeRepository {
       rethrow;
     }
   }
+  
+  // Método para buscar cidades por query
+  Future<Response> searchCidades(String query, Options options) async {
+    try {
+      log('Searching cidades with query: $query');
+      
+      // Utilizando a mesma instância de Dio
+      var response = await _dio.get(
+        '$kBaseURL/cidades/search?q=$query', 
+        options: options
+      );
+      
+      log('Search response status: ${response.statusCode}');
+      return response;
+    } catch (error) {
+      log('Error searching cidades: $error');
+      rethrow;
+    }
+  }
 }
