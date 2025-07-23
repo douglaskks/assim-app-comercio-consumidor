@@ -29,4 +29,5 @@ class Screens {
   static const String marcarEnviado = '/pedidos/finalizar/mark_delivery_screen';
   static const String recuperarSenha =
       '/forgot-password/forgot_password_screen';
+  static const String orderDetails = '/pedidos/order_details_screen'; // Nova rota adicionada
 }

@@ -12,19 +12,57 @@ import '../../constants/app_text_constants.dart';
 class BancaController with ChangeNotifier {
   List<BancaModel> _bancas = [];
   List<FeiraModel> _feiras = [];
+  bool _isLoading = false; // Adicionar controle de loading
   final BancaRepository _bancaRepository = BancaRepository();
 
   List<BancaModel> get bancas => _bancas;
   List<FeiraModel> get feiras => _feiras;
+  bool get isLoading => _isLoading; // Getter para loading
+
+  // Método para controlar loading
+  void setLoading(bool loading) {
+    _isLoading = loading;
+    notifyListeners();
+  }
 
   Future<void> loadBancas(int feiraId) async {
-    /* UserStorage userStorage = UserStorage();
-    String userToken = await userStorage.getUserToken(); */
     try {
-      _bancas = await _bancaRepository.getBancas(feiraId);
+      setLoading(true);
+      List<BancaModel> todasBancas = await _bancaRepository.getBancas(feiraId); // ← CORRIGIDO: _bancaRepository
+      
+      // Filtrar apenas bancas abertas
+      List<BancaModel> bancasAbertas = todasBancas.where((banca) {
+        return banca.isCurrentlyOpen();
+      }).toList();
+      
+      // Ordenar por nome
+      bancasAbertas.sort((a, b) => a.nome.compareTo(b.nome));
+      
+      _bancas = bancasAbertas;
+      setLoading(false);
       notifyListeners();
-    } catch (error) {
-      print('Erro ao carregar as bancas: $error');
+    } catch (e) {
+      setLoading(false);
+      print('Erro ao carregar bancas: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> loadAllBancas(int feiraId) async {
+    try {
+      setLoading(true);
+      List<BancaModel> todasBancas = await _bancaRepository.getBancas(feiraId);
+      
+      // Ordenar por nome
+      todasBancas.sort((a, b) => a.nome.compareTo(b.nome));
+      
+      _bancas = todasBancas;
+      setLoading(false);
+      notifyListeners();
+    } catch (e) {
+      setLoading(false);
+      print('Erro ao carregar bancas: $e');
+      rethrow;
     }
   }
 
@@ -38,6 +76,8 @@ class BancaController with ChangeNotifier {
     }
 
     try {
+      setLoading(true); // Adicionar loading para busca também
+      
       var options = Options(headers: {
         "Content-Type": "application/json",
         "Accept": "application/json",
@@ -54,16 +94,23 @@ class BancaController with ChangeNotifier {
           _bancas = [];
           print('Nenhuma banca encontrada para a busca: $query');
         } else {
-          _bancas = List<BancaModel>.from(
+          List<BancaModel> bancasEncontradas = List<BancaModel>.from(
               json['bancas'].map((x) => BancaModel.fromJson(x)));
+          
+          // Filtrar bancas abertas também na busca
+          _bancas = bancasEncontradas.where((banca) {
+            return banca.isCurrentlyOpen();
+          }).toList();
         }
       } else {
         _bancas = [];
         print('Erro ao buscar bancas: Status ${response.statusCode}');
       }
+      setLoading(false);
     } catch (error) {
       print('Erro na busca de bancas: $error');
       _bancas = [];
+      setLoading(false);
     }
     notifyListeners();
   }
@@ -73,6 +120,8 @@ class BancaController with ChangeNotifier {
     String userToken = await userStorage.getUserToken();
     Dio dio = Dio();
     try {
+      setLoading(true); // Adicionar loading
+      
       var bairrosResponse = await dio.get(
         '$kBaseURL/bairros/cidade/$cidadeId',
         options: Options(
@@ -108,17 +157,21 @@ class BancaController with ChangeNotifier {
           _feiras = feirasJson
               .where((feira) => bairroIds.contains(feira.bairroId))
               .toList();
+          setLoading(false);
           notifyListeners();
         } else {
           print('Erro ao carregar bancas: ${feirasResponse.statusCode}');
+          setLoading(false);
           throw Exception('Failed to load bancas');
         }
       } else {
         print('Erro ao carregar bairros: ${bairrosResponse.statusCode}');
+        setLoading(false);
         throw Exception('Failed to load bairros');
       }
     } catch (error) {
       print('Erro ao carregar as feiras e bairros: $error');
+      setLoading(false);
       rethrow;
     }
   }

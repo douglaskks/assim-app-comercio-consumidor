@@ -19,8 +19,6 @@ class PurchasesScreen extends StatefulWidget {
 }
 
 class _PurchasesScreenState extends State<PurchasesScreen> {
-  int selectedIndex = 2;
-
   @override
   void initState() {
     super.initState();
@@ -31,20 +29,12 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
 
   void _onOrderTapped(int orderId) {
     print('Pedido com id ID $orderId clicado!');
-    var order = context
-        .read<PedidoController>()
-        .orders
-        .firstWhere((order) => order.id == orderId);
-
-    if (order.status == 'pagamento pendente' ||
-        order.status == 'comprovante anexado') {
-      Navigator.pushNamed(context, Screens.pagamento,
-          arguments: {"orderId": orderId, "status": order.status});
-    } else if (order.status == 'aguardando retirada' ||
-        order.status == 'pedido enviado') {
-      Navigator.pushNamed(context, Screens.marcarEnviado,
-          arguments: {"orderId": orderId});
-    }
+    // Navegar para a página de detalhes do pedido
+    Navigator.pushNamed(
+      context, 
+      Screens.orderDetails,
+      arguments: {"orderId": orderId}
+    );
   }
 
   @override
@@ -76,24 +66,28 @@ class _PurchasesScreenState extends State<PurchasesScreen> {
             width: MediaQuery.of(context).size.width,
             padding: const EdgeInsets.all(20),
             child: controller.orders.isNotEmpty
-                ? SingleChildScrollView(
-                    child: Column(
-                      children: [
-                        const VerticalSpacerBox(size: SpacerSize.small),
-                        ...List.generate(controller.orders.length, (index) {
-                          var order = controller.orders[index];
-                          return OrderCard(
-                            orderNumber: '#${index + 1}',
-                            sellerName: order.bancaNome ?? 'Banca Desconhecida',
-                            itemsTotal: order.subtotal,
-                            /*  shippingHandling: order.taxaEntrega, */
-                            date: formatDate(order.dataPedido),
-                            status: order.status,
-                            onTap: () => _onOrderTapped(order.id),
-                          );
-                        }),
-                        const VerticalSpacerBox(size: SpacerSize.medium),
-                      ],
+                ? RefreshIndicator(
+                    onRefresh: () => controller.loadOrders(),
+                    color: kDetailColor,
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: Column(
+                        children: [
+                          const VerticalSpacerBox(size: SpacerSize.small),
+                          ...List.generate(controller.orders.length, (index) {
+                            var order = controller.orders[index];
+                            return OrderCard(
+                              orderNumber: '#${index + 1}',
+                              sellerName: order.bancaNome ?? 'Banca Desconhecida',
+                              itemsTotal: order.subtotal,
+                              date: formatDate(order.dataPedido),
+                              status: order.status,
+                              onTap: () => _onOrderTapped(order.id),
+                            );
+                          }),
+                          const VerticalSpacerBox(size: SpacerSize.medium),
+                        ],
+                      ),
                     ),
                   )
                 : _buildEmptyListWidget(context),
@@ -167,7 +161,7 @@ Widget _buildEmptyListWidget(BuildContext context) {
             ),
           ),
           const SizedBox(height: 16),
-          /*ElevatedButton.icon(
+          ElevatedButton.icon(
             icon: const Icon(Icons.store),
             label: const Text('Ver catálogo'),
             style: ElevatedButton.styleFrom(
@@ -175,9 +169,9 @@ Widget _buildEmptyListWidget(BuildContext context) {
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
             ),
             onPressed: () {
-              // Navegação para a tela de catálogo
+              Navigator.pushNamed(context, Screens.home);
             },
-          ),*/
+          ),
         ],
       ),
     ),

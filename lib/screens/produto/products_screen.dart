@@ -7,6 +7,7 @@ import 'package:ecommerceassim/shared/components/dialogs/confirm_dialog.dart';
 import 'package:ecommerceassim/shared/core/controllers/products_controller.dart';
 import 'package:ecommerceassim/screens/produto/components/build_product_card.dart';
 import 'package:ecommerceassim/shared/core/models/produto_model.dart';
+import 'package:ecommerceassim/shared/core/models/banca_model.dart'; // ← ADICIONAR IMPORT
 import 'package:flutter/material.dart';
 import 'package:ecommerceassim/shared/constants/style_constants.dart';
 import 'package:ecommerceassim/components/utils/vertical_spacer_box.dart';
@@ -48,18 +49,39 @@ class _MenuProductsScreenState extends State<MenuProductsScreen> {
     final cartListProvider = Provider.of<CartProvider>(context);
     final Map<String, dynamic> arguments =
         ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>;
+    
     final int bancaId = arguments['id'];
     final String bancaNome = arguments['nome'];
-    final String horarioAbertura = arguments['horario_abertura'];
-    final String horarioFechamento = arguments['horario_fechamento'];
+    final BancaModel? banca = arguments['banca'] as BancaModel?;
 
-    String formatarHorario(String horario) {
-      List<String> partes = horario.split(':');
-      return '${partes[0]}:${partes[1]}';
+    // Função para obter texto de horário da banca
+    String obterTextoHorario(BancaModel? banca) {
+      if (banca == null) return 'Banca aberta';
+      
+      final now = DateTime.now();
+      final diasSemana = [
+        'domingo', 'segunda-feira', 'terca-feira', 'quarta-feira',
+        'quinta-feira', 'sexta-feira', 'sábado'
+      ];
+      
+      final diaAtual = diasSemana[now.weekday % 7];
+      
+      // Se tem horários de funcionamento
+      if (banca.horariosFuncionamento != null && 
+          banca.horariosFuncionamento!.containsKey(diaAtual)) {
+        final horarios = banca.horariosFuncionamento![diaAtual]!;
+        if (horarios.length >= 2) {
+          return 'Hoje: ${horarios[0]} às ${horarios[1]}';
+        }
+      }
+      
+      // Se tem horários fixos (fallback)
+      if (banca.horarioAbertura != null && banca.horarioFechamento != null) {
+        return 'Aberto das ${banca.horarioAbertura} até ${banca.horarioFechamento}';
+      }
+      
+      return 'Banca aberta';
     }
-
-    String horarioAberturaFormatado = formatarHorario(horarioAbertura);
-    String horarioFechamentoFormatado = formatarHorario(horarioFechamento);
 
     // ignore: deprecated_member_use
     return WillPopScope(
@@ -106,7 +128,7 @@ class _MenuProductsScreenState extends State<MenuProductsScreen> {
                               ),
                             ),
                             Text(
-                              'Aberto das $horarioAberturaFormatado até $horarioFechamentoFormatado',
+                              obterTextoHorario(banca), // ← USANDO A FUNÇÃO NOVA
                               style: const TextStyle(
                                 fontSize: 16,
                                 color: Colors.grey,

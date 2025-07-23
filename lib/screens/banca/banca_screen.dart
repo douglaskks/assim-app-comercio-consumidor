@@ -22,6 +22,30 @@ class Bancas extends StatefulWidget {
 class _BancasState extends State<Bancas> {
   String searchQuery = '';
   final Debouncer debouncer = Debouncer(milliseconds: 500);
+  bool _isInitialized = false; // Controlar inicialização
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Carregar dados apenas uma vez
+    if (!_isInitialized) {
+      _initializeData();
+      _isInitialized = true;
+    }
+  }
+
+  void _initializeData() {
+    final arguments =
+        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>;
+    final int feiraId = arguments['id'] as int;
+    
+    // Carregar bancas após o build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final bancaController =
+          Provider.of<BancaController>(context, listen: false);
+      bancaController.loadBancas(feiraId);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -60,8 +84,6 @@ class _BancasState extends State<Bancas> {
         formattedHours.add('$capitalizedDay das $openingTime às $closingTime');
       });
 
-/*       return 'Dias de funcionamento:\n\n${formattedHours.join('\n')}';
- */
       return formattedHours.join('\n');
     }
 
@@ -128,39 +150,39 @@ class _BancasState extends State<Bancas> {
             ),
           ),
           Expanded(
-            child: FutureBuilder(
-              future: Provider.of<BancaController>(context, listen: false)
-                  .loadBancas(feiraId),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
+            child: Consumer<BancaController>(
+              builder: (context, bancaController, child) {
+                // Se está carregando, mostrar loading
+                if (bancaController.isLoading) {
                   return const Center(
                     child: CircularProgressIndicator(
                       valueColor: AlwaysStoppedAnimation<Color>(kDetailColor),
                     ),
                   );
-                } else if (snapshot.hasError) {
-                  return _buildErrorWidget();
                 }
 
-                final bancaController = Provider.of<BancaController>(context);
                 List<BancaModel> bancas = bancaController.bancas;
 
+                // Se não há bancas
                 if (bancas.isEmpty) {
                   if (searchQuery.isEmpty) {
                     return _buildEmptyListWidget();
                   } else {
-                    return _buildErrorWidget();
+                    return _buildNoSearchResultsWidget();
                   }
                 }
 
-                final filteredBancas = bancas
-                    .where((banca) => banca.nome
-                        .toLowerCase()
-                        .contains(searchQuery.toLowerCase()))
-                    .toList();
+                // Filtrar bancas pela busca (se houver)
+                final filteredBancas = searchQuery.isEmpty
+                    ? bancas
+                    : bancas
+                        .where((banca) => banca.nome
+                            .toLowerCase()
+                            .contains(searchQuery.toLowerCase()))
+                        .toList();
 
                 if (filteredBancas.isEmpty) {
-                  return _buildEmptyListWidget();
+                  return _buildNoSearchResultsWidget();
                 }
 
                 return ListView.builder(
@@ -178,8 +200,7 @@ class _BancasState extends State<Bancas> {
   }
 
   Widget _buildBancaItem(BuildContext context, BancaModel banca) {
-    final bool isOpen =
-        isCurrentlyOpen(banca.horarioAbertura, banca.horarioFechamento);
+    final bool isOpen = banca.isCurrentlyOpen();
     return Opacity(
       opacity: isOpen ? 1.0 : 0.5,
       child: Container(
@@ -202,14 +223,27 @@ class _BancasState extends State<Bancas> {
           child: InkWell(
             onTap: () {
               if (!isOpen) {
+                // Mostrar diálogo informando que a banca está fechada
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Banca Fechada'),
+                    content: Text('A banca "${banca.nome}" está fechada no momento.'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('OK'),
+                      ),
+                    ],
+                  ),
+                );
               } else {
                 Navigator.pushNamed(context, Screens.menuProducts, arguments: {
+                  'banca': banca,
                   'id': banca.id,
                   'nome': banca.nome,
-                  'horario_abertura': banca.horarioAbertura,
-                  'horario_fechamento': banca.horarioFechamento,
                 });
-                print(banca.id);
+                print('Banca ID: ${banca.id}');
               }
             },
             child: Padding(
@@ -236,6 +270,10 @@ class _BancasState extends State<Bancas> {
                             'Banca fechada',
                             style: TextStyle(fontSize: 16, color: Colors.red),
                           ),
+                        // Mostrar horário se disponível
+                        if (banca.horariosFuncionamento != null && 
+                            banca.horariosFuncionamento!.isNotEmpty)
+                          _buildHorarioInfo(banca),
                       ],
                     ),
                   ),
@@ -248,17 +286,40 @@ class _BancasState extends State<Bancas> {
     );
   }
 
+  // Método auxiliar para mostrar informações de horário
+  Widget _buildHorarioInfo(BancaModel banca) {
+    final now = DateTime.now();
+    final diasSemana = [
+      'domingo', 'segunda-feira', 'terca-feira', 'quarta-feira',
+      'quinta-feira', 'sexta-feira', 'sábado'
+    ];
+    
+    final diaAtual = diasSemana[now.weekday % 7];
+    
+    if (banca.horariosFuncionamento!.containsKey(diaAtual)) {
+      final horarios = banca.horariosFuncionamento![diaAtual]!;
+      if (horarios.length >= 2) {
+        return Text(
+          'Hoje: ${horarios[0]} às ${horarios[1]}',
+          style: const TextStyle(fontSize: 14, color: Colors.grey),
+        );
+      }
+    }
+    
+    return const SizedBox.shrink();
+  }
+
   Widget _buildEmptyListWidget() {
     return Center(
       child: Padding(
         padding: const EdgeInsets.only(
-            top: 120.0, left: 21.0, right: 21.0), // Ajuste os valores aqui
+            top: 120.0, left: 21.0, right: 21.0),
         child: Column(
           children: [
             const Icon(Icons.storefront, color: kDetailColor, size: 80),
             const SizedBox(height: 10),
             const Text(
-              'Nenhuma banca foi encontrada.',
+              'Nenhuma banca aberta no momento.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 22,
@@ -268,7 +329,7 @@ class _BancasState extends State<Bancas> {
             ),
             const SizedBox(height: 10),
             Text(
-              'Não há bancas cadastradas para esta feira ou elas estão indisponíveis no momento.',
+              'Não há bancas abertas para esta feira no momento.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 16,
@@ -281,20 +342,20 @@ class _BancasState extends State<Bancas> {
     );
   }
 
-  Widget _buildErrorWidget() {
+  Widget _buildNoSearchResultsWidget() {
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(
-            vertical: 0.0, horizontal: 12.0), // Ajuste os valores aqui
+            vertical: 0.0, horizontal: 12.0),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, color: kDetailColor, size: 80),
+            const Icon(Icons.search_off, color: kDetailColor, size: 80),
             const SizedBox(height: 20),
             const Text(
-              'Nenhuma banca foi encontrada.',
+              'Nenhuma banca encontrada.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 22,
@@ -316,17 +377,4 @@ class _BancasState extends State<Bancas> {
       ),
     );
   }
-}
-
-bool isCurrentlyOpen(String openingTime, String closingTime) {
-  final now = DateTime.now();
-  final openingHour = int.parse(openingTime.split(':')[0]);
-  final openingMinute = int.parse(openingTime.split(':')[1]);
-  final closingHour = int.parse(closingTime.split(':')[0]);
-  final closingMinute = int.parse(closingTime.split(':')[1]);
-  final openingDateTime =
-      DateTime(now.year, now.month, now.day, openingHour, openingMinute);
-  final closingDateTime =
-      DateTime(now.year, now.month, now.day, closingHour, closingMinute);
-  return now.isAfter(openingDateTime) && now.isBefore(closingDateTime);
 }

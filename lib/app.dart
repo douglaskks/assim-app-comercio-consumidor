@@ -7,6 +7,7 @@ import 'package:ecommerceassim/screens/favorito/favorite_screen.dart';
 import 'package:ecommerceassim/screens/favorito/favorite_seller_screen.dart';
 import 'package:ecommerceassim/screens/forgot-password/forgot_password_screen.dart';
 import 'package:ecommerceassim/screens/pedidos/mark_delivery_screen.dart';
+import 'package:ecommerceassim/screens/pedidos/order_details_screen.dart'; // Importação da nova tela
 import 'package:ecommerceassim/screens/pedidos/payment_screen.dart';
 import 'package:ecommerceassim/screens/pedidos/purchases_screen.dart';
 import 'package:ecommerceassim/screens/produto/detalhes/products_details_screen.dart';
@@ -101,6 +102,12 @@ class App extends StatelessWidget {
             final args =
                 ModalRoute.of(context)!.settings.arguments as Map<String, int>;
             return MarkAsDeliveredScreen(orderId: args['orderId']!);
+          },
+          // Nova rota para a tela de detalhes do pedido
+          Screens.orderDetails: (BuildContext context) {
+            final args =
+                ModalRoute.of(context)!.settings.arguments as Map<String, dynamic>;
+            return OrderDetailsScreen(orderId: args['orderId']);
           },
         },
       ),
