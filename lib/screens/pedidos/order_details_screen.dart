@@ -172,37 +172,40 @@ class OrderDetailsScreen extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Pedido #${order.id}',
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Pedido #${order.id}',
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Realizado em ${_formatDateTime(order.dataPedido)}',
-                            style: TextStyle(
-                              color: Colors.grey[600],
+                            const SizedBox(height: 4),
+                            Text(
+                              'Realizado em ${_formatDateTime(order.dataPedido)}',
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
+                      const SizedBox(width: 8),
                       _buildStatusBadge(order.status),
                     ],
                   ),
                   
                   const SizedBox(height: 24),
                   
-                  // Progress Tracker
                   OrderProgressTracker(currentStatus: order.status),
                   
                   const SizedBox(height: 24),
                   
-                  // Detalhes do Pedido
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
